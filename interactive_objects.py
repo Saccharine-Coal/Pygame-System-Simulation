@@ -6,40 +6,36 @@ SCALE = 25000/1 # (100px/1AU)
 
 class InteractableObject:
     """Class for mouse interactable elements on the screen."""
-    def __init__(self, surface, x, y, rect_radius):
+    def __init__(self, surface, x, y, w, h):
         self.surface = surface
-        # Center a rect object about the given x, y
-        self.rect_radius = rect_radius
-        center = x-rect_radius, y-rect_radius
-        self.rect = pg.Rect(center, (2*rect_radius, 2*rect_radius))
+        # get topleft position with x, y being the center
+        # use round because rect rounds down, so 5.9 becomes 5
+        topleft = round(x-w*.5), round(y-h*.5)
+        self.rect = pg.Rect(topleft, (w, h))
         # (x, y) = screen coordinates where (1 px, 1 px) = (1 SCALE, 1 SCALE)
         # where 100 px = 1 AU, SCALE = 100 px / 1 AU
         self.xy = self.rect.center
-        self.x, self.y = self.xy[:]
-        self.xy_t = x, y
 
-        def __repr__(self):
-            return f'[{self.rect}]'
+    def __repr__(self):
+        return f'{self.__class__.__name__}, rect: {self.rect}'
+    
+    def __setattr__(self, attr, value):
+        """Helper function to set attributes for a dictionary of variable length."""
+        super().__setattr__(attr, value)
 
     def draw(self, color):
-        pg.draw.circle(self.surface, color, self.xy, self.rect_radius)
-
-    def cart_to_meter(self, x_px, y_px):
-        """Convert scaled cartesian to meters for computations."""
-        #1 AU = 149.6e9 m
-        x_m, y_m = x_px*(1/SCALE)*149.6e9, y_px*(1/SCALE)*149.6e9 # px*(AU/px)*(m/AU) = m
-        return x_m, y_m
-
-    def meter_to_cart(self, x_m, y_m):
-        """Convert meters to scaled cartesian coordinates."""
-        x_px, y_px = x_m*SCALE/149.6e9, y_m*SCALE/149.6e9
-        return x_px, y_px
-
-    def m_to_c(self, meter):
-        # debug function
-        return (meter*SCALE)/149.6e9
-
-    def c_to_m(self, cart):
+        pg.draw.rect(self.surface, color, self.xy, self.rect)
+    
+    @staticmethod
+    def meter_to_cart(meters):
+        """Convert meters to scaled cartesian(pixel) coordinates."""
+        # 1 AU = 149.6e9 m
+        pixels = meters*SCALE/149.6e9
+        return pixels
+    
+    @staticmethod
+    def cart_to_meter(cart):
+        """Convert scaled cartesian(pixel) coordinates to meters."""
         return cart*(1/SCALE)*149.6e9
 
     def distance(self, second_object):
@@ -49,29 +45,36 @@ class InteractableObject:
         delta_x, delta_y = self.sub(point_1, point_2)[:]
         squared_sum = pow(delta_x, 2) + pow(delta_y, 2)
         return math.sqrt(squared_sum)
-
-    def add(self, iter_1, iter_2):
+    
+    @staticmethod
+    def add(iter_1, iter_2):
         """Add every element of two iterables."""
         return tuple(int(a + b) for a, b in zip(iter_1, iter_2))
 
-    def sub(self, iter_1, iter_2):
+    @staticmethod
+    def sub(iter_1, iter_2):
         """Subtract every element of two iterables."""
         return tuple(int(a - b) for a, b in zip(iter_1, iter_2))
 
 
 class PolarObject(InteractableObject):
     """Class for any polar coordinate object."""
-    def __init__(self, surface, r, theta, rect_radius):
-        self.r, self.theta = r, theta
-        x, y = self.polar_to_cartesian(r, theta)
-        super().__init__(surface, x, y, rect_radius)
-
-    def __str__(self):
-        return f'PolarObject @ Cart: ({self.x}, {self.y}), Polar: ({self.r}, {self.theta})'
+    def __init__(self, surface, pole, x, y, rect_radius):
+        self.pole, self.rec_radius = pole, rect_radius
+        self.r, self.theta = self.cartesian_to_polar(x, y)
+        super().__init__(surface, x, y, rect_radius*2, rect_radius*2)
 
     # POLAR FUNCTIONS ---------------------------------------
+    
+    def get_rel_to_pole(self, x, y):
+        """Get the x, y position relative to the reference point of the polar coordinate, the pole."""
+        return self.sub((x, y), self.pole)
+    
     def cartesian_to_polar(self, x, y):
+        """Cartesian position to polar position where (0, 0) is the reference point."""
         # r = (x^2+y^2)^2, theta = tan^-1(y/x)
+        # pole is the reference point of the coordinate system
+        x, y = self.get_rel_to_pole(x, y)
         r = math.sqrt(pow(x, 2)+pow(y, 2))
         # set specific code for edge cases
         if x == 0 and y != 0:
@@ -82,8 +85,10 @@ class PolarObject(InteractableObject):
         else:
             theta = math.atan(y/x)
         return r, theta
-
-    def polar_to_cartesian(self, r, theta):
+    
+    @staticmethod
+    def polar_to_cartesian(r, theta):
+        """Polar position to cartesian position where (0, 0) is the reference point."""
         # x = rcos(theta), y = rsin(theta)
         x, y = r*math.cos(theta), r*math.sin(theta)
         return x, y
@@ -102,22 +107,31 @@ class PolarObject(InteractableObject):
 
 class MassObject(PolarObject):
     """Class for any mass object; stars, planet, asteriods."""
-    def __init__(self, surface, r, theta, rect_radius, mass):
+    def __init__(self, surface, pole, x, y, rect_radius, mass_object_dictionary):
+        # MassObject specific attributes
+        # set a dictionary for the object using the object name: so self.MassObject_dictionary = dictionary
+        self.__setattr__(self.__class__.__name__ + '_dictionary', mass_object_dictionary)
+        self.set_attr_from_dict(mass_object_dictionary)
+        self.G = 6.67408e-11 # m^3 kg^-1 s^-2
         # will use a scale in terms of AU to keep track of objects relative to the surface,
         # but SI units for computations.
         # surface is in cartesian coordinates, but computations will exist in polar coordinates
-        """ r meter, theta -> r px, theta -> (x px, y px)"""
-        r = self.m_to_c(r)
-        x, y = self.polar_to_cartesian(r, theta)
-        super().__init__(surface, x, y, rect_radius)
-        # MassObject specific attributes
-        self.mass = mass # kg
-        self.G = 6.67408e-11 # m^3 kg^-1 s^-2
-        self.velocity = 0 # m/s
-        self.r, self.theta = r, theta
-
-    def __str__(self):
-        return f'MassObject @ ({self.x}, {self.y})'
+        super().__init__(surface, pole, x, y, rect_radius)
+        self.convert_by_type()
+    
+    def set_attr_from_dict(self, dictionary):
+        """Set attr using dict keys as attr names and values as attr values."""
+        for key in dictionary:
+            self.__setattr__(key, dictionary.get(key))
+    
+    def convert_by_type(self):
+        """Convert dict values whether the MassObject is a Star or Planet."""
+        if isinstance(self, Star):
+            # https://stackoverflow.com/questions/11637293/iterate-over-object-attributes-in-python
+            star_attr_list = list(filter(lambda attr: attr.startswith('st_'), dir(self)))
+        if isinstance(self, Planet):
+            # https://stackoverflow.com/questions/11637293/iterate-over-object-attributes-in-python
+            star_attr_list = list(filter(lambda attr: attr.startswith('pl_'), dir(self)))
 
     def gravity(self, second_object):
         """Returns force of gravity exerted by the mass object on the second object and vice versa."""
@@ -126,24 +140,25 @@ class MassObject(PolarObject):
         r = self.radial_distance(second_object)
         return (self.G*m1*m2)/pow(r, 2)
 
-    def volume(self):
+    @staticmethod
+    def volume(radius):
         # V = 4/3(pi)(r^3), m^3
-        return (4/3)*(math.pi)*(pow(self.radius, 3))
+        return (4/3)*(math.pi)*(pow(radius, 3))
 
-    def density(self):
+    @staticmethod
+    def density(mass, volume):
         # D = mass / V, kg/m
-        return self.mass/self.volume()
+        return mass/volume
 
 
 class Star(MassObject):
     """We will assume only stars exert significant enough gravity to reduce computation."""
-    def __init__(self, surface, x, y, rect_radius, name, st_mass, st_rad):
-        r, theta = self.cartesian_to_polar(x, y)
-        r = self.c_to_m(r)
-        self.name = name
-        self.mass, self.radius = self.convert_stellar_to_si(st_mass, st_rad)
-        super().__init__(surface, r, theta, rect_radius, self.mass)
-        print((x, y), self.xy)
+    def __init__(self, surface, x, y, star_dictionary):
+        # stellar rad -> meters -> scaled cart(px)
+        # stellar mass -> kg and so forth
+        pole = (0, 0) # Stars will be the center of the system
+        rect_radius = 2
+        super().__init__(surface, pole, x, y, rect_radius, star_dictionary)
 
     def convert_stellar_to_si(self, st_mass, st_rad):
         # convert stellar units to SI units
@@ -192,5 +207,10 @@ class Planet(MassObject):
         denominator = 4*pow(math.pi, 2)
         return pow(numerator/denominator, 1/3)
 
+
+if __name__ == "__main__":
+    m = Star('surface', 0, 0, {'st_mass': 5, 'test': 0})
 # s = Star('screen', 0, 0, 5, 'TRAPPIST-1', 0.12, 0.08)
 # p = Planet('screen', 5, s, 'TRAPPIST-1 b', 1.51087081, 1.086, 0.85)
+#
+
