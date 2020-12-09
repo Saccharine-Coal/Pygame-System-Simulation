@@ -124,6 +124,13 @@ class MassObject(PolarObject):
         """FIX LATER"""
         self.scale = SCALE
 
+    def __repr__(self):
+        dictionary = getattr(self, str(self.__class__.__name__) + '_dictionary')
+        string_list = []
+        for key in dictionary:
+            string_list.append(f'{key}: {dictionary.get(key)}')
+        return string_list
+
     def set_attr_from_dict(self, dictionary):
         """Set attr using dict keys as attr names and values as attr values."""
         for key in dictionary:
@@ -257,6 +264,9 @@ class Planet(MassObject):
         self.theta = random.uniform(0, 2*math.pi)
         self.rect.center = self.polar_to_cartesian(self.r, self.theta)
         self.rect.w = self.rect.w
+
+    def __str__(self):
+        return f'{self.__class__.__name__}, rect: {self.rect}'
 
     def move(self, dt):
         """Group all time functions here."""

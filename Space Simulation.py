@@ -11,7 +11,7 @@ WIDTH, HEIGHT = 1280, 720
 FPS = 60
 
 # FONT
-TEXT = 'Exo-planet Sim Working v.1'
+TEXT = 'Exo-planet Sim Working v-1.1'
 TEXTCOLOR = (0, 0, 0)
 TEXTBACKGROUND = (255, 255, 255)
 FONTTYPE = 'freesansbold.ttf'
@@ -53,14 +53,16 @@ class Game:
                     sys.exit()
                 if event.key == pg.K_w:
                     print('K_w')
-                    self.system.change_scale(0.1)
+                    self.system.move_system(0, -50)
                 if event.key == pg.K_s:
                     print('K_s')
-                    self.system.change_scale(-0.1)
+                    self.system.move_system(0, 50)
                 if event.key == pg.K_d:
                     print('K_d')
+                    self.system.move_system(50, 0)
                 if event.key == pg.K_a:
                     print('K_a')
+                    self.system.move_system(-50, 0)
             if event.type == pg.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     # Left Click
@@ -71,9 +73,11 @@ class Game:
                 if event.button == 4:
                     # Scroll Wheel Up
                     print('Scroll Wheel Up')
+                    self.system.change_scale(0.1)
                 if event.button == 5:
                     # Scroll Wheel Down
                     print('Scroll Wheel Down')
+                    self.system.change_scale(-0.1)
 
     def init(self):
         # Initialize
@@ -83,6 +87,7 @@ class Game:
     def update(self):
         # Update
         pg.display.set_caption("{:.2f}".format(self.clock.get_fps()))
+        self.m_pos = pg.mouse.get_pos()
         self.system.update(self.dt*10)
 
     def draw(self):
@@ -90,6 +95,7 @@ class Game:
         self.screen.fill(pg.color.Color("Light Blue"))
         self.screen.blit(self.text_surface, self.screen.get_rect().topleft)
         self.system.draw()
+        self.system.hover_display(self.m_pos)
         pg.display.flip()
 
 
