@@ -11,7 +11,7 @@ WIDTH, HEIGHT = 1280, 720
 FPS = 60
 
 # FONT
-TEXT = 'HELLO WORLD!'
+TEXT = 'Exo-planet Sim Working v.1'
 TEXTCOLOR = (0, 0, 0)
 TEXTBACKGROUND = (255, 255, 255)
 FONTTYPE = 'freesansbold.ttf'
@@ -53,8 +53,10 @@ class Game:
                     sys.exit()
                 if event.key == pg.K_w:
                     print('K_w')
+                    self.system.change_scale(0.1)
                 if event.key == pg.K_s:
                     print('K_s')
+                    self.system.change_scale(-0.1)
                 if event.key == pg.K_d:
                     print('K_d')
                 if event.key == pg.K_a:
@@ -81,11 +83,12 @@ class Game:
     def update(self):
         # Update
         pg.display.set_caption("{:.2f}".format(self.clock.get_fps()))
+        self.system.update(self.dt*10)
 
     def draw(self):
         # Draw
         self.screen.fill(pg.color.Color("Light Blue"))
-        self.screen.blit(self.text_surface, self.screen.get_rect().center)
+        self.screen.blit(self.text_surface, self.screen.get_rect().topleft)
         self.system.draw()
         pg.display.flip()
 
