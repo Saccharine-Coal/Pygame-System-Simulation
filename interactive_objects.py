@@ -3,7 +3,7 @@ import pygame as pg
 import math
 import random
 
-SCALE = 25000/1 # (100px/1AU)
+SCALE = 50000/1 # (100px/1AU)
 
 class InteractableObject:
     """Class for mouse interactable elements on the screen."""
@@ -66,8 +66,22 @@ class PolarObject(InteractableObject):
         super().__init__(surface, x, y, rect_radius*2, rect_radius*2)
         """FIX LATER"""
         self.scale = SCALE
+        self.mask = self.get_mask()
 
     # POLAR FUNCTIONS ---------------------------------------
+
+    def get_mask(self):
+        """Return mask of the object for pixel perfect collisions."""
+        w, h = self.rect.w, self.rect.h
+        colorkey = (0, 0, 0)
+        surface = pg.Surface((w, h))
+        surface.set_colorkey(colorkey)
+        # fill the surface with the spherical object
+        color, center, radius = (255, 255, 255), self.rect.center, round(self.rect.w/2)
+        pg.draw.circle(surface, color, center, radius)
+        mask = pg.mask.from_surface(surface)
+        return mask
+
 
     def get_rel_to_pole(self, x, y):
         """Get the x, y position relative to the reference point of the polar coordinate, the pole."""
@@ -106,6 +120,58 @@ class PolarObject(InteractableObject):
 
     def radial_distance(self, second_object):
         return abs(self.r-second_object.r)
+
+
+class Particle(PolarObject):
+    """Base class for any particle. In polar to easily generate particles around circular objects."""
+    def __init__(self, host_object):
+        self.surface, self.pole = host_object.surface, host_object.pole
+        # how fast particles "decay" and get deleted once vw becomes 0
+        self.decay_rate = 2
+
+    def generate_random_particles(self):
+        self.particles = []
+        self.particle_vectors = []
+        # vectors in polar form
+        number_of_particles = random.randint(0, 10)
+        for i in range(number_of_particles):
+            w = random.randint(1, 10)
+            self.particles.append(pg.Rect(self.pole, (w, w)))
+            vw, vr, theta =  random.randint(1, 30), random.randint(0, 10), random.uniform(0, 2*math.pi)
+            vector = pg.Vector2()
+            vector.from_polar((vr, theta))
+            self.particle_vectors.append([vector, vw])
+
+    def update(self, dt):
+        del_set = []
+        for i in range(len(self.particles)):
+            vector, vw = self.particle_vectors[i][:]
+            vx, vy = vector.xy[:]
+            dx, dy = vx*dt, vy*dt
+            p = self.particles[i]
+            print(p, dx, dy)
+            p = p.move(dx, dy)
+            print(p)
+            # update w
+            p.w -= self.decay_rate
+            p.h -= self.decay_rate
+            # remove 0 or, negative w, h rects
+            if p.w <= 0:
+                # don't remove during iteration
+                del_set.append(p)
+                del_set.append(vector)
+        if len(del_set) != 0:
+            # https://stackoverflow.com/questions/36268749/remove-multiple-items-from-a-python-list-in-just-one-statement
+            item_list = self.particles
+            self.particles = [elm for elm in item_list if elm not in (del_set)]
+            item_list = self.particle_vectors
+            self.particle_vectors = [elm for elm in item_list if elm not in (del_set)]
+        if len(self.particles) == 0:
+            self.generate_random_particles()
+
+    def draw(self):
+        for particle in self.particles:
+            pg.draw.circle(self.surface, (0, 0, 0), particle.center, particle.w)
 
 
 class MassObject(PolarObject):
@@ -148,6 +214,9 @@ class MassObject(PolarObject):
         else:
             self.rect.w, self.rect.h = round(rect_radius*2), round(rect_radius*2)
         self.r = self.r*ratio
+        # resize mask
+        w, h = self.rect.w, self.rect.h
+        self.mask = self.mask.scale((w, h))
 
     def draw(self, color):
         center, radius = self.rect.center, self.rect.w
@@ -206,6 +275,10 @@ class Star(MassObject):
         self.scale = SCALE
         super().__init__(surface, pole, x, y, star_dictionary)
 
+    def move(self, dt):
+        """Group all time functions here."""
+        dt = dt
+
     def convert_stellar_to_si(self, st_mass, st_rad):
         # convert stellar units to SI units
         # stellar mass = 1.989e30 kg.
@@ -217,36 +290,11 @@ class Star(MassObject):
 
     def draw(self):
         """Group star specific drawing functions."""
-        #self.draw_pulse()
         self.draw_body()
 
     def draw_body(self):
-        color, center, radius = (255, 255, 0), self.rect.center, self.rect.w
+        color, center, radius = (255, 255, 0), self.rect.center, round(self.rect.w/2)
         pg.draw.circle(self.surface, color, center, radius)
-
-    def draw_pulse(self):
-        """Simple pulse effect for stars."""
-        color, center, radius = (100, 100, 0), self.rect.center, random.uniform(self.rect.w, self.rect.w*1.5)
-        radius = int(radius)
-        pg.draw.circle(self.surface, color, center, radius)
-        # generate a random number of triangles
-        for i in range(0, random.randint(0, 20)):
-            # get random points on the arc of the star
-            theta1 = random.uniform(0, 2*math.pi)
-            while True:
-                theta2 = random.uniform(0, 2*math.pi)
-                if theta1 != theta2:
-                    break
-            p1 = (self.polar_to_cartesian(self.rect.w, theta1))
-            p2 = (self.polar_to_cartesian(self.rect.w, theta2))
-            # midpoint between p1, p2
-            p3 = self.add(p1, p2)
-            # get a random length of the triangle
-            length1 = random.randint(-20, 20)
-            length2 = random.randint(-20, 20)
-            p3 = (p3[0]/2+length1, p3[1]/2+length2)
-            pg.draw.polygon(self.surface, (0, 0, 0), [p1, p2, p3])
-
 
 class Planet(MassObject):
     """Planets are always relative to a Star."""
@@ -264,28 +312,28 @@ class Planet(MassObject):
         self.theta = random.uniform(0, 2*math.pi)
         self.rect.center = self.polar_to_cartesian(self.r, self.theta)
         self.rect.w = self.rect.w
+        self.vw = self.get_angular_velocity(self.get_radial_distance_from(self.host_star), self.T)
 
     def __str__(self):
         return f'{self.__class__.__name__}, rect: {self.rect}'
 
     def move(self, dt):
         """Group all time functions here."""
-        w_m = self.get_angular_velocity()
-        w_px = self.meter_to_cart(w_m)
-        self.theta += w_px*dt
+        w_px = self.meter_to_cart(self.vw)
+        # delta_theta = delta_s/r
+        self.theta += self.vw*dt/self.get_radial_distance_from(self.host_star)
         self.rect.center = self.polar_to_cartesian(self.r, self.theta)
 
     def draw(self, color):
         self.draw_planet(color)
         self.draw_orbit()
 
-    def get_angular_velocity(self):
+    @staticmethod
+    def get_angular_velocity(r, T):
         """Get radial velocity relative to host star."""
-        # http://www.mso.anu.edu.au/~pfrancis/roleplay/MysteryPlanet/Orbits/
-        # velocity = ((G * mass_of_star)/delta_radius)^1/2
-        num = self.G * self.host_star.mass
-        denom = self.get_radial_distance_from(self.host_star)
-        return math.sqrt(num / denom)
+        # http://www.hep.fsu.edu/~berg/teach/phy2048/0918.pdf
+        # velocity = 2(pi)r/T
+        return (2*math.pi*r)/T
 
 #     def change_of_origin(self, r, theta):
 #         """Change of origin position, the star, necesitates a shift of r, theta in the planet."""
@@ -293,7 +341,7 @@ class Planet(MassObject):
 #         return shifted_r, shifted_theta
 
     def draw_planet(self, color):
-        center, radius = self.rect.center, self.rect.w
+        center, radius = self.rect.center, round(self.rect.w/2)
         pg.draw.circle(self.surface, color, center, radius)
 
     def draw_orbit(self):

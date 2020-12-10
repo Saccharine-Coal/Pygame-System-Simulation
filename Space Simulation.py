@@ -10,12 +10,15 @@ import galaxy_system as gs
 WIDTH, HEIGHT = 1280, 720
 FPS = 60
 
-# FONT
-TEXT = 'Exo-planet Sim Working v-1.1'
+# FONT SETTINGS
+TEXT = 'Exo-planet Sim Working v-1.2'
 TEXTCOLOR = (0, 0, 0)
 TEXTBACKGROUND = (255, 255, 255)
 FONTTYPE = 'freesansbold.ttf'
 FONTSIZE = 24
+
+# SIMULATION SETTINGS
+TIMESCALE = 1000
 
 
 class Game:
@@ -63,6 +66,9 @@ class Game:
                 if event.key == pg.K_a:
                     print('K_a')
                     self.system.move_system(-50, 0)
+                if event.key == pg.K_SPACE:
+                    print('K_SPACE')
+
             if event.type == pg.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     # Left Click
@@ -88,7 +94,7 @@ class Game:
         # Update
         pg.display.set_caption("{:.2f}".format(self.clock.get_fps()))
         self.m_pos = pg.mouse.get_pos()
-        self.system.update(self.dt*10)
+        self.system.update(self.dt*TIMESCALE)
 
     def draw(self):
         # Draw

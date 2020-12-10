@@ -31,6 +31,7 @@ class System:
             planet.pole = self.host_star.pole
 
     def update(self, dt):
+        self.host_star.move(dt)
         for planet in self.planets:
             planet.move(dt)
 
@@ -49,16 +50,24 @@ class System:
     def hover_display(self, m_pos):
         """Creates a display at the mouse position if the mouse is over a point."""
         if self.host_star.rect.collidepoint(m_pos):
-            text_list = self.host_star.__repr__()
-            text_surfaces = self.render_text(text_list)
-            self.blit_text(self.surface, text_surfaces, m_pos)
-            return
-        for planet in self.planets:
-            if planet.rect.collidepoint(m_pos):
-                text_list = planet.__repr__()
+            # pixel perfect collision
+            x, y = self.host_star.rect.topleft[:]
+            pos_in_mask = (m_pos[0]-x, m_pos[1]-y)
+            if not self.host_star.mask.get_at(pos_in_mask):
+                text_list = self.host_star.__repr__()
                 text_surfaces = self.render_text(text_list)
                 self.blit_text(self.surface, text_surfaces, m_pos)
-                break
+                return
+        for planet in self.planets:
+            if planet.rect.collidepoint(m_pos):
+                # pixel perfect collision
+                x, y = planet.rect.topleft[:]
+                pos_in_mask = (m_pos[0]-x, m_pos[1]-y)
+                if not planet.mask.get_at(pos_in_mask):
+                    text_list = planet.__repr__()
+                    text_surfaces = self.render_text(text_list)
+                    self.blit_text(self.surface, text_surfaces, m_pos)
+                    break
 
     # TEXT FUNCTIONS ----------------------------------
 
