@@ -11,7 +11,7 @@ WIDTH, HEIGHT = 1280, 720
 FPS = 60
 
 # FONT SETTINGS
-TEXT = 'Exo-planet Sim Working v-1.2'
+TEXT = 'Exo-planet Sim Working v-1.3'
 TEXTCOLOR = (0, 0, 0)
 TEXTBACKGROUND = (255, 255, 255)
 FONTTYPE = 'freesansbold.ttf'
@@ -88,6 +88,8 @@ class Game:
     def init(self):
         # Initialize
         self.text_surface = self.font.render(TEXT, True, TEXTCOLOR, TEXTBACKGROUND)
+        text = 'Time Scale = ' + str(TIMESCALE) + 'x'
+        self.text_surface1 = self.font.render(text, True, TEXTCOLOR, TEXTBACKGROUND)
         self.system = gs.System('PS_2020.11.30_14.52.15 - Copy', self.screen)
 
     def update(self):
@@ -99,9 +101,12 @@ class Game:
     def draw(self):
         # Draw
         self.screen.fill(pg.color.Color("Light Blue"))
-        self.screen.blit(self.text_surface, self.screen.get_rect().topleft)
         self.system.draw()
         self.system.hover_display(self.m_pos)
+        self.screen.blit(self.text_surface, self.screen.get_rect().topleft)
+        x, y = self.screen.get_rect().topright
+        x -= self.text_surface1.get_rect().w
+        self.screen.blit(self.text_surface1, (x, y))
         pg.display.flip()
 
 

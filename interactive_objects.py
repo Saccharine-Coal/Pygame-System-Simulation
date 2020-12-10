@@ -363,10 +363,3 @@ class Planet(MassObject):
         numerator = G*star.mass*pow(self.T, 2)
         denominator = 4*pow(math.pi, 2)
         return pow(numerator/denominator, 1/3)
-
-
-if __name__ == "__main__":
-    s = Star('surface', 0, 0, {'st_rad': 0.12, 'st_mass': 0.08, 'st_teff': 2559, 'test': 0})
-    p = Planet('screen', s, 10, 10, {'pl_orbper': 1.51087081,'pl_rade': 1.086,'pl_masse': 0.85})
-
-
