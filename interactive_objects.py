@@ -291,6 +291,24 @@ class Star(MassObject):
     def draw(self):
         """Group star specific drawing functions."""
         self.draw_body()
+        shadow_surface = self.transparent_subsurface(self.surface, self.rect)
+        rect = shadow_surface.get_rect()
+        # works with topleft, but doesn't seems to work with center
+        center, radius = rect.topleft, int(self.rect.w/2)
+        pg.draw.circle(shadow_surface, (0, 0, 0, 100), center, radius)
+        self.surface.blit(shadow_surface, self.rect.topleft)
+
+    @staticmethod
+    def transparent_surface(size):
+        surface = pg.Surface(size).convert_alpha()
+        surface.fill((0, 0, 0, 0))
+        return surface
+
+    @staticmethod
+    def transparent_subsurface(surface, rect):
+        surface = surface.subsurface(rect).convert_alpha()
+        surface.fill((0, 0, 0, 0))
+        return surface
 
     def draw_body(self):
         color, center, radius = (255, 255, 0), self.rect.center, round(self.rect.w/2)
@@ -317,6 +335,13 @@ class Planet(MassObject):
     def __str__(self):
         return f'{self.__class__.__name__}, rect: {self.rect}'
 
+    def get_subsurface(self):
+        """Generate a subsurface bound by the instance rect."""
+        w, h = self.rect.w, self.rect.h
+        surface = pg.Surface((w, h))
+        surface.set_colorkey((0, 0, 0))
+        return pg.Surface((w, h))
+
     def move(self, dt):
         """Group all time functions here."""
         w_px = self.meter_to_cart(self.vw)
@@ -327,6 +352,25 @@ class Planet(MassObject):
     def draw(self, color):
         self.draw_planet(color)
         self.draw_orbit()
+        x1, y1, x2, y2 = *self.host_star.rect.center[:], *self.rect.center[:]
+        othorg_vector = self.get_orthog_norm(x1, y1, x2, y2)
+        othorg_vector.scale_to_length(self.rect.w*10)
+        pos1 = self.rect.center[0]-othorg_vector.x, self.rect.center[1]-othorg_vector.y
+        pos2 = self.rect.center[0]+othorg_vector.x, self.rect.center[1]+othorg_vector.y
+        pg.draw.line(self.surface, (255, 0, 0), self.rect.center, pos1)
+        pg.draw.line(self.surface, (255, 0, 0), self.rect.center, pos2)
+        shadow_surface = self.get_subsurface()
+        x1, y1, y1, y2 = *pos1[:], *pos2[:]
+        r1, start_angle, r2, end_angle = *self.cartesian_to_polar(x1, y1), *self.cartesian_to_polar(x2, y2)
+        pg.draw.arc(self.surface, (0, 0, 0), self.rect, start_angle, end_angle, int(self.rect.w/2))
+
+
+    @staticmethod
+    def get_orthog_norm(x1, y1, x2, y2):
+        dx, dy = (x2-x1, y2-y1)
+        vector = pg.math.Vector2((-dy, dx))
+        vector.normalize()
+        return vector
 
     @staticmethod
     def get_angular_velocity(r, T):
